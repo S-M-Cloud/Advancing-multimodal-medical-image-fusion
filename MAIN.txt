@@ -1,0 +1,68 @@
+close all; clear all; clc;
+
+%% Input images
+Image_input1=imread(MRI image);
+Image_input2=imread([PET/SPECT image]);
+
+ Image_input1_HSV=rgb2hsv(Image_input1);
+ Image_input1_intensity=imsharp(Image_input1_HSV(:,:,3), 7, .8); 
+ 
+ Image_input2_HSV=rgb2hsv(Image_input2);
+ Image_input2_intensity=imsharp(Image_input2_HSV(:,:,3), 3, .8); 
+
+%% +++++++++++++++++++++++++++++++ OUR method +++++++++++++++++++++++++++++++++++++++++++++++
+% Image decomposition  
+[d1_fs,d1_cs,B1] = guided1_GF_decomposition(Image_input1_intensity);
+[d2_fs,d2_cs,B2] = guided2_GF_decomposition(Image_input2_intensity);
+
+%% Fusion section
+
+B_F = max(B1,B2);
+
+t = 4;
+F_10 = Fusion_STPCNN(d1_fs{1},d2_fs{1},t);
+F_11 = Fusion_STPCNN(d1_cs{1},d2_cs{1},t);
+F_20 = Fusion_STPCNN(d1_fs{2},d2_fs{2},t);
+F_21 = Fusion_STPCNN(d1_cs{2},d2_cs{2},t);
+F_30 = Fusion_STPCNN(d1_fs{3},d2_fs{3},t);
+F_31 = Fusion_STPCNN(d1_cs{3},d2_cs{3},t);
+
+F_inten = F_10+F_11+F_20+F_21+F_30+F_31+B_F;
+
+Image_input2_HSV(:,:,3) = F_inten;
+
+F = hsv2rgb(Image_input2_HSV);  
+
+% subplot(1,3,1)
+% imshow(Image_input1),title('MRI')
+% subplot(1,3,2)
+% imshow(Image_input2),title('PET')
+% subplot(1,3,3)
+% imshow(F),title('Fused Image'); 
+
+%% Measure the metrics
+% % Entropy:
+EN = entropy(F);  
+% % Piella fusion quality index:
+Piella_s_structure_similarity=metricPeilla(Image_input1_intensity,Image_input2_intensity,F_inten,1); 
+% Tone Mapped image Quality Index:
+[Q, S, N, s_maps, s_local] = TMQI(Image_input1, F);
+% Feature Mutual Information:
+fmi = fmi(Image_input1_intensity,Image_input2_intensity,Image_input2_HSV(:,:,3)); 
+% Qy:
+[ Qy ] = QY(Image_input1_intensity,Image_input2_intensity,Image_input2_HSV(:,:,3));
+% Qabf:
+Qabf = analysis_Qabf(Image_input1_intensity,Image_input2_intensity,Image_input2_HSV(:,:,3));
+% THE SUM OF THE CORRELATIONS OF DIFFERENCES:
+SCD=analysis_SCD(Image_input1_intensity,Image_input2_intensity,Image_input2_HSV(:,:,3));
+% SSIM:
+mssim1 = ssim(Image_input1_intensity, Image_input2_HSV(:,:,3));
+mssim2 = ssim(Image_input2_intensity, Image_input2_HSV(:,:,3));
+mssim=(mssim1+mssim2)/2;
+
+
+
+
+
+
+
